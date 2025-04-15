@@ -1,1 +1,252 @@
+import speech_recognition as sr
+import pyttsx3
+import datetime
+import re
+import random
+import webbrowser
+import subprocess
+from googletrans import Translator
+import threading
+from bs4 import BeautifulSoup
 
+# Инициализация синтезатора речи и переводчика
+engine = pyttsx3.init()
+translator = Translator()
+
+jokes = [
+    "Почему программисты не любят природу? Потому что в ней слишком много багов.",
+    "Какой язык программирования самый оптимистичный? Python, потому что он всегда говорит: 'Я могу это сделать!'",
+    "Почему у компьютера плохое настроение? Потому что у него много вирусов.",
+    "Какой самый оптимистичный цвет? Синий, потому что он всегда в 'синем' настроении!",
+    "Почему коты не любят интернет? Потому что они не могут поймать мышь!"
+]
+
+def speak(text):
+    engine.say(text)
+    engine.runAndWait()
+
+def listen():
+    recognizer = sr.Recognizer()
+    with sr.Microphone() as source:
+        print("Слушаю...")
+        audio = recognizer.listen(source)
+        try:
+            command = recognizer.recognize_google(audio, language='ru-RU')
+            print(f"Вы сказали: {command}")
+            return command
+        except sr.UnknownValueError:
+            print("Не удалось распознать речь")
+            return ""
+        except sr.RequestError:
+            print("Ошибка сервиса распознавания")
+            return ""
+
+def get_current_time():
+    now = datetime.datetime.now()
+    return now.strftime("%H:%M:%S")
+
+def get_current_date():
+    now = datetime.datetime.now()
+    return now.strftime("%Y-%m-%d")
+
+def calculate(expression):
+    try:
+        expression = re.sub(r'[^0-9+\-*/().]', '', expression)
+        result = eval(expression)
+        return result
+    except Exception as e:
+        return "Ошибка в вычислении"
+
+def greet_user(name=None):
+    greetings = [
+        "Доброе утро!",
+        "Добрый день!",
+        "Добрый вечер!",
+        "Приветствую вас!",
+        "Здравствуйте!",
+        "Рад вас видеть!",
+        "Как приятно вас слышать!"
+    ]
+    
+    now = datetime.datetime.now()
+    hour = now.hour
+
+    if hour < 12:
+        greeting = random.choice(greetings[:3])
+    elif 12 <= hour < 18:
+        greeting = random.choice(greetings[3:5])
+    else:
+        greeting = random.choice(greetings[5:])
+
+    if name:
+        greeting += f" {name}!"
+    else:
+        greeting += "!"
+
+    speak(greeting)
+
+
+def ask_for_name():
+    speak("Как вас зовут?")
+    name = listen()
+    return name
+
+def search_for_video_on_youtube(*args: tuple):
+    if not args[0]: return
+    search_term = " ".join(args[0])
+    url = "https://www.youtube.com/results?search_query=" + search_term
+    webbrowser.open(url)
+
+def search_in_yandex(*args: tuple):
+    if not args[0]: return
+    search_term = " ".join(args[0])
+    url = "https://yandex.ru/search/?text=" + search_term
+    webbrowser.open(url)
+
+def search_in_google(*args: tuple):
+    if not args[0]: return
+    search_term = " ".join(args[0])
+    url = "https://www.google.com/search?q=" + search_term
+    webbrowser.open(url)
+
+def flip_coin():
+    result = random.choice(["орел", "решка"])
+    return result
+
+def translate_text(text, dest_language):
+    valid_languages = ['en', 'ru', 'zh-cn', 'zh-tw', 'fr', 'de', 'es']  # Добавьте нужные языки
+    if dest_language not in valid_languages:
+        return "Извините, я не поддерживаю этот язык."
+    
+    try:
+        translated = translator.translate(text, dest=dest_language)
+        return translated.text
+    except Exception as e:
+        print(f"Ошибка при переводе: {e}")
+        return "Ошибка при переводе."
+
+def launch_calculator():
+    try:
+        subprocess.Popen('calc.exe')  # Для Windows
+        speak("Калькулятор запущен.")
+    except Exception as e:
+        speak("Не удалось запустить калькулятор.")
+
+def launch_notepad():
+    try:
+        subprocess.Popen('notepad.exe')  # Для Windows
+        speak("Блокнот запущен.")
+    except Exception as e:
+        speak("Не удалось запустить блокнот.")
+
+def launch_browser():
+    try:
+        webbrowser.open('http://www.google.com')  # Открывает браузер с Google
+        speak("Браузер запущен.")
+    except Exception as e:
+        speak("Не удалось запустить браузер.")
+
+def search_for_joke():
+    joke = random.choice(jokes)
+    speak(joke)
+
+
+def deactivate_after_delay(seconds):
+    threading.Timer(seconds, deactivate).start()
+
+def deactivate():
+    global active
+    active = False
+    speak("Я отключаюсь. Скажите 'включись', чтобы снова активировать меня.")
+
+def activate():
+    global active
+    active = True
+    speak("Я снова активен. Как я могу помочь вам?")
+
+
+def main():
+    global active
+    active = True  # Флаг для отслеживания состояния помощника
+    name = ask_for_name()
+    greet_user(name)
+    speak("Привет я Пикси, ваш цифровой помощник. Как я могу помочь вам?")
+    
+    
+    while True:
+        command = listen()
+
+        if "время" in command and active:
+            current_time = get_current_time()
+            speak(f"Текущее время: {current_time}")
+
+        elif "привет" in command and active:
+            speak(f"Привет, {name}! Как дела?")
+        
+        elif "выход" in command:
+            speak("До свидания!")
+            break
+
+        elif "поиск в гугле" in command and active:
+            search_term = command.split("поиск в гугле ")[-1].split()
+            search_in_google(search_term)
+        
+        elif "поиск в яндексе" in command and active:
+            search_term = command.split("поиск в яндексе ")[-1].split()
+            search_in_yandex(search_term)
+        
+        elif "поиск на ютубе" in command and active:
+            search_term = command.split("поиск на ютубе ")[-1].split()
+            search_for_video_on_youtube(search_term)
+        
+        elif "подбрось монету" in command and active:
+            result = flip_coin()
+            speak(f"Результат подбрасывания монеты: {result}")
+
+        elif "анекдот" in command and active:
+            search_for_joke()
+
+        elif "перевести на русский" in command and active:
+            text_to_translate = command.split("перевести на русский ")[-1]
+            translated_text = translate_text(text_to_translate, 'ru')
+            speak(translated_text)
+        
+        elif "перевести на китайский" in command and active:
+            text_to_translate = command.split("перевести на китайский ")[-1]
+            translated_text = translate_text(text_to_translate, 'zh-cn')
+            speak(translated_text)
+        
+
+        elif "перевести на английский" in command and active:
+            text_to_translate = command.split("перевести на английский ")[-1]
+            translated_text = translate_text(text_to_translate, 'en')
+            speak(translated_text)
+
+        elif "видео" in command and active:
+            search_for_video_on_youtube(command.split("видео ")[-1].split())
+
+        elif "дата" in command and active:
+            current_date = get_current_date()
+            speak(f"Сегодня: {current_date}")
+
+        elif "калькулятор" in command and active:
+            launch_calculator()
+
+        elif "блокнот" in command and active:
+            launch_notepad()
+    
+        elif "браузер" in command and active:
+            launch_browser()
+
+        
+        elif "отключись" in command:
+            deactivate()
+
+        elif "включись" in command:
+            activate()
+
+            if active:
+                speak("Извините, я не понимаю команду.")
+
+if __name__ == "__main__":
+    main()
